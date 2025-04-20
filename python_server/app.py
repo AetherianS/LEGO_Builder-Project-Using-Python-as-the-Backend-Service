@@ -270,7 +270,10 @@ async def add_brick(room_id: str, brick: BrickCoordinates):
     # 创建积木数据
     brick_data = {
         "intersect": {
-            "point": {  #针对坐标系进行初步标准化，将坐标定位在网格上
+            "point": {  
+                #针对坐标系进行初步标准化，将坐标定位在网格上。
+                #例如：想在前端网格(0,0,0)位置添加积木，则brick.x=0,brick.y=0,brick.z=0，
+                #此时对应网格实际坐标为(12.5,0,12.5)
                 "x": -(12.5+(-brick.x-1)*25),
                 "y": brick.y*35,
                 "z": -(12.5+(brick.z-1)*25)
@@ -296,7 +299,29 @@ async def add_brick(room_id: str, brick: BrickCoordinates):
         }
     }
     
-    # 更新房间中的积木数据
+    # 检查与现有积木的碰撞
+    collision_detected = False
+    collision_with = None
+    debug_info = []
+    
+    for existing_brick in rooms[room_id]["bricks"]:
+        collision_result = check_collision(brick_data, existing_brick)
+        debug_info.append(collision_result["debug_info"])  # 收集所有碰撞检测的调试信息
+        if collision_result["collision"]:
+            collision_detected = True
+            collision_with = existing_brick["uID"]
+            break
+    
+    if collision_detected:
+        # 如果发生碰撞，返回错误信息和调试信息
+        return {
+            "status": "error", 
+            "message": f"碰撞检测失败: 新积木与ID为 {collision_with} 的积木发生碰撞",
+            "collision_with": collision_with,
+            "debug_info": debug_info
+        }
+    
+    # 如果没有碰撞，更新房间中的积木数据
     rooms[room_id]["bricks"].append(brick_data)
     
     # 广播给房间内所有用户
@@ -305,7 +330,11 @@ async def add_brick(room_id: str, brick: BrickCoordinates):
         json.dumps({"type": "UPDATE_BRICKS", "data": rooms[room_id]["bricks"]})
     )
     
-    return {"status": "success", "data": brick_data}
+    return {
+        "status": "success", 
+        "data": brick_data,
+        "debug_info": debug_info  # 即使没有碰撞也返回调试信息
+    }
 
 
 @app.get("/api/bricks/{room_id}")
@@ -421,6 +450,66 @@ async def delete_brick(room_id: str, brick_id: str):
     
     # 如果未找到指定ID的积木
     raise HTTPException(status_code=404, detail="Brick not found")
+
+
+def check_collision(brick1, brick2):
+    """
+    检查两个积木是否发生碰撞，考虑实际尺寸和高度
+    """
+    # 获取积木1的位置
+    x1 = brick1["intersect"]["point"]["x"]
+    y1 = brick1["intersect"]["point"]["y"]
+    z1 = brick1["intersect"]["point"]["z"]
+    
+    # 获取积木1的尺寸（考虑实际尺寸）
+    width1 = brick1["dimensions"]["x"] * 25  # base = 25
+    height1 = 35  # height = 35
+    depth1 = brick1["dimensions"]["z"] * 25  # base = 25
+    
+    # 获取积木2的位置
+    x2 = brick2["intersect"]["point"]["x"]
+    y2 = brick2["intersect"]["point"]["y"]
+    z2 = brick2["intersect"]["point"]["z"]
+    
+    # 获取积木2的尺寸（考虑实际尺寸）
+    width2 = brick2["dimensions"]["x"] * 25  # base = 25
+    height2 = 35  # height = 35
+    depth2 = brick2["dimensions"]["z"] * 25  # base = 25
+    
+    # 检查x轴方向
+    x_overlap = abs(x1 - x2) < (width1 + width2) / 2
+    
+    # 检查z轴方向
+    z_overlap = abs(z1 - z2) < (depth1 + depth2) / 2
+    
+    # 检查y轴方向（高度）- 考虑y坐标的缩放因子
+    # 由于y坐标被乘以了35，我们需要相应地调整高度
+    y_overlap = abs(y1 - y2) < 35  # 使用<而不是<=，允许积木正好堆叠
+    
+    # 生成调试信息
+    debug_info = {
+        "brick1": {
+            "position": {"x": x1, "y": y1, "z": z1},
+            "dimensions": {"width": width1, "height": height1, "depth": depth1}
+        },
+        "brick2": {
+            "position": {"x": x2, "y": y2, "z": z2},
+            "dimensions": {"width": width2, "height": height2, "depth": depth2}
+        },
+        "overlap": {
+            "x": x_overlap,
+            "y": y_overlap,
+            "z": z_overlap
+        }
+    }
+    
+    # 只有在x和z轴都有重叠，且y轴也有重叠时，才认为发生碰撞
+    collision = x_overlap and z_overlap and y_overlap
+    
+    return {
+        "collision": collision,
+        "debug_info": debug_info
+    }
 
 
 if __name__ == "__main__":

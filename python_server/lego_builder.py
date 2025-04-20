@@ -142,23 +142,49 @@ if __name__ == "__main__":
     try:
         result = client.add_brick(
             room_id="123123",
-            x=1,
+            x=0,
             y=0,
-            z=1,
-            dimensions_x=2,
-            dimensions_z=2,
+            z=0,
+            dimensions_x=1,
+            dimensions_z=1,
             color="#00ff00",
         )
+        print(result)
+
+        result = client.add_brick(
+            room_id="123123",
+            x=1,
+            y=0,
+            z=0,
+            dimensions_x=1,
+            dimensions_z=1,
+            color="#00ffff",
+        )
+        print(result)
+
+        result = client.add_brick(
+            room_id="123123",
+            x=0,
+            y=0,
+            z=1,
+            dimensions_x=1,
+            dimensions_z=1,
+            color="#ff0000",
+        )
+        print(result)
+
         result = client.add_brick(
             room_id="123123",
             x=1,
             y=1,
             z=1,
-            dimensions_x=2,
-            dimensions_z=2,
-            color="#00ffff",
+            dimensions_x=1,
+            dimensions_z=1,
+            color="#ff0000",
         )
-        print("添加积木成功:", result)
+        print(result)
+
+        print("添加积木尝试完成:")
         
         # 获取所有积木
         bricks = client.get_all_bricks("123123")
@@ -171,8 +197,8 @@ if __name__ == "__main__":
             print("积木详情:", brick)
             
             # 删除积木
-            delete_result = client.delete_brick("123123", brick_id)
-            print("删除积木结果:", delete_result)
+            # delete_result = client.delete_brick("123123", brick_id)
+            # print("删除积木结果:", delete_result)
     
     except requests.exceptions.HTTPError as e:
         print(f"HTTP 错误: {e}")
